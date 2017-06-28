@@ -104,9 +104,11 @@ def generator(batch_size, z_dim):
 z_dimensions = 100
 batch_size = 50
 
+# 作为鉴别器的输入
 x_placeholder = tf.placeholder(tf.float32, shape = [None,28,28,1], name='x_placeholder')
 # x_placeholder is for feeding input images to the discriminator
 
+# 保持生成器生成的图片
 Gz = generator(batch_size, z_dimensions)
 # Gz holds the generated images
 
