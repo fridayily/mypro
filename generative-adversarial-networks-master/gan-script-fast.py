@@ -21,6 +21,8 @@ track progress and see sample images in TensorBoard.
 
 import tensorflow as tf
 import datetime
+import numpy as np
+import matplotlib.pyplot  as plt
 
 # Load MNIST data
 from tensorflow.examples.tutorials.mnist import input_data
@@ -64,11 +66,14 @@ def discriminator(images, reuse_variables=None):
         return d4
 
 # Define the generator network fast
+# 一般卷积中[5,5,1,32] 前两个纬度是patch的大小，第3个是输入通道数目，第4个是输出通道数目
+# 输入一个N为的向量，转换成56*56,最后生成28*28的图像
 def generator(batch_size, z_dim):
+    # 生成截断正态分布随机数
     z = tf.random_normal([batch_size, z_dim], mean=0, stddev=1, name='z')
     g_w1 = tf.get_variable('g_w1', [z_dim, 3136], dtype=tf.float32, initializer=tf.truncated_normal_initializer(stddev=0.02))
     g_b1 = tf.get_variable('g_b1', [3136], initializer=tf.truncated_normal_initializer(stddev=0.02))
-    g1 = tf.matmul(z, g_w1) + g_b1
+    g1 = tf.matmul(z, g_w1) + g_b1 # 矩阵乘法
     g1 = tf.reshape(g1, [-1, 56, 56, 1])
     g1 = tf.contrib.layers.batch_norm(g1, epsilon=1e-5, scope='bn1')
     g1 = tf.nn.relu(g1)
@@ -112,25 +117,47 @@ x_placeholder = tf.placeholder(tf.float32, shape = [None,28,28,1], name='x_place
 Gz = generator(batch_size, z_dimensions)
 # Gz holds the generated images
 
+# Dx 为鉴别器预测MNIST图片为真的概率
 Dx = discriminator(x_placeholder)
 # Dx will hold discriminator prediction probabilities
 # for the real MNIST images
 
+# Dg 为鉴别器预测生成图片的概率
 Dg = discriminator(Gz, reuse_variables=True)
 # Dg will hold discriminator prediction probabilities for generated images
 
+
+# 鉴别器的目的正确的把MNIST图片标记为真，生成图片标记为假
+# 为鉴别器计算两个losses，对真实图片的与1比较，对生成图片与0比较
+# 鉴别器后面没有softmax和sigmoid层
+# sigmoid_cross_entropy_with_logits operates on unscaled values rather than probability values from 0 to 1
+# GAN在鉴别器饱和 或者过于自信（对生成器的输出预测值为0）时失败，这导致鉴别器没有有效的梯度下降
+
+# reduce_mean 取由交叉熵函数反回矩阵中所有分量的平均值
 # Define losses
+
 d_loss_real = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = Dx, labels = tf.ones_like(Dx)))
 d_loss_fake = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = Dg, labels = tf.zeros_like(Dg)))
+
+# 生成器的loss函数，生成器希望当其输出图片时鉴别器的输出接近1
 g_loss = tf.reduce_mean(tf.nn.sigmoid_cross_entropy_with_logits(logits = Dg, labels = tf.ones_like(Dg)))
 
+
+# 生成器的优化函数需要更新生成器的权重参数，而不要生成鉴别器的参数
+# 训练鉴别器时同样要保持生成器参数
 # Define variable lists
+# 把所有定义为trainable=True的变量以list返回
 tvars = tf.trainable_variables()
 d_vars = [var for var in tvars if 'd_' in var.name]
 g_vars = [var for var in tvars if 'g_' in var.name]
 
+print([v.name for v in d_vars])
+print([v.name for v in g_vars])
+
 # Define the optimizers
 # Train the discriminator
+# Adam 是GAN长用的优化算法，自适的学习速率和动量
+# 为鉴别器设置两个优化函数，一个鉴别真实图片，一个鉴别生图片
 d_trainer_fake = tf.train.AdamOptimizer(0.0003).minimize(d_loss_fake, var_list=d_vars)
 d_trainer_real = tf.train.AdamOptimizer(0.0003).minimize(d_loss_real, var_list=d_vars)
 
@@ -139,6 +166,11 @@ g_trainer = tf.train.AdamOptimizer(0.0001).minimize(g_loss, var_list=g_vars)
 
 # From this point forward, reuse variables
 tf.get_variable_scope().reuse_variables()
+# 当tf.get_variable_scope().reuse == False时，作用域就是为创建新变量所设置的
+# 当tf.get_variable_scope().reuse == True时，作用域是为重用变量所设置
+# test_vars = tf.get_variable_scope().reuse_variables()
+# print(test_vars)
+# 调用tf.get_variable(name),得到一个已经存在名字为name的变量
 
 sess = tf.Session()
 
@@ -155,16 +187,22 @@ writer = tf.summary.FileWriter(logdir, sess.graph)
 
 sess.run(tf.global_variables_initializer())
 
+# 为了训练鉴别器，从MNIST取一批图片作为正样本，用生成图片作为负样本
+# 生成器的改进输出，鉴别器同样改进以将改进输出后的生成器所生成的图片标记为假
 # Pre-train discriminator
-for i in range(300):
-    real_image_batch = mnist.train.next_batch(batch_size)[0].reshape([batch_size, 28, 28, 1])
-    _, __ = sess.run([d_trainer_real, d_trainer_fake],
-                                           {x_placeholder: real_image_batch})
+# for i in range(300):
+#     real_image_batch = mnist.train.next_batch(batch_size)[0].reshape([batch_size, 28, 28, 1])
+#     _, __ = sess.run([d_trainer_real, d_trainer_fake],
+#                                            {x_placeholder: real_image_batch})
 
 # Train generator and discriminator together
+
+
 for i in range(100000):
     real_image_batch = mnist.train.next_batch(batch_size)[0].reshape([batch_size, 28, 28, 1])
 
+    print('0',sess.run(d_vars[0]))
+    print('1',sess.run(d_vars[1]))
     # Train discriminator on both real and fake images
     _, __ = sess.run([d_trainer_real, d_trainer_fake],
                                            {x_placeholder: real_image_batch})
@@ -176,3 +214,16 @@ for i in range(100000):
         # Update TensorBoard with summary statistics
         summary = sess.run(merged, {x_placeholder: real_image_batch})
         writer.add_summary(summary, i)
+
+
+# saver = tf.train.Saver()
+# with tf.Session() as sess:
+#     saver.restore(sess, 'pretrained-model/pretrained_gan.ckpt')
+#     z_batch = np.random.normal(0, 1, size=[10, z_dimensions])
+#     # z = tf.random_normal([batch_size, z_dim], mean=0, stddev=1, name='z')
+#     z_placeholder = tf.placeholder(tf.float32, [None, z_dimensions], name='z_placeholder')
+#     generated_images = generator(10, z_dimensions)
+#     images = sess.run(generated_images, {z_placeholder: z_batch})
+#     for i in range(10):
+#         plt.imshow(images[i].reshape([28, 28]), cmap='Greys')
+#         plt.show()

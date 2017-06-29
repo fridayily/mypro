@@ -182,3 +182,15 @@ for i in range(100000):
         z_batch = np.random.normal(0, 1, size=[batch_size, z_dimensions])
         summary = sess.run(merged, {z_placeholder: z_batch, x_placeholder: real_image_batch})
         writer.add_summary(summary, i)
+
+
+saver = tf.train.Saver()
+with tf.Session() as sess:
+    saver.restore(sess, 'pretrained-model/pretrained_gan.ckpt')
+    z_batch = np.random.normal(0, 1, size=[10, z_dimensions])
+    z_placeholder = tf.placeholder(tf.float32, [None, z_dimensions], name='z_placeholder')
+    generated_images = generator(z_placeholder, 10, z_dimensions)
+    images = sess.run(generated_images, {z_placeholder: z_batch})
+    for i in range(10):
+        plt.imshow(images[i].reshape([28, 28]), cmap='Greys')
+        plt.show()
