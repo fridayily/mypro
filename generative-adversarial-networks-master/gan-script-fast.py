@@ -30,37 +30,42 @@ mnist = input_data.read_data_sets("MNIST_data/")
 
 # Define the discriminator network
 def discriminator(images, reuse_variables=None):
+    # variable_scope 创建变量空间，管理由get_variable创建的命名空间
+    # get_variable_scope用来重复使用当前变量空间中的变量
     with tf.variable_scope(tf.get_variable_scope(), reuse=reuse_variables) as scope:
         # First convolutional and pool layers
-        # This finds 32 different 5 x 5 pixel features
-        d_w1 = tf.get_variable('d_w1', [5, 5, 1, 32], initializer=tf.truncated_normal_initializer(stddev=0.02))
-        d_b1 = tf.get_variable('d_b1', [32], initializer=tf.constant_initializer(0))
-        d1 = tf.nn.conv2d(input=images, filter=d_w1, strides=[1, 1, 1, 1], padding='SAME')
-        d1 = d1 + d_b1
-        d1 = tf.nn.relu(d1)
-        d1 = tf.nn.avg_pool(d1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        # This finds 32 different 5 x 5 pixel features 输入1维，输出32维
+        d_w1 = tf.get_variable('d_w1', [5, 5, 1, 32], initializer=tf.truncated_normal_initializer(stddev=0.02)) #Tensor("d_w1/read:0", shape=(5, 5, 1, 32), dtype=float32)
+        print('___________________')
+        tf.Print(d_w1,[d_w1])
+        d_b1 = tf.get_variable('d_b1', [32], initializer=tf.constant_initializer(0)) # Tensor("d_b1/read:0", shape=(32,), dtype=float32)
+        d1 = tf.nn.conv2d(input=images, filter=d_w1, strides=[1, 1, 1, 1], padding='SAME') #Tensor("Conv2D_3:0", shape=(?, 28, 28, 32), dtype=float32)
+        d1 = d1 + d_b1 # Tensor("add_4:0", shape=(?, 28, 28, 32), dtype=float32) .....Tensor("add_8:0", shape=(50, 28, 28, 32), dtype=float32)
+        d1 = tf.nn.relu(d1) # Tensor("Relu_3:0", shape=(?, 28, 28, 32), dtype=float32) .....Tensor("Relu_6:0", shape=(50, 28, 28, 32), dtype=float32)
+        # 池化层
+        d1 = tf.nn.avg_pool(d1, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME') # Tensor("AvgPool:0", shape=(?, 14, 14, 32), dtype=float32) .....Tensor("AvgPool_2:0", shape=(50, 14, 14, 32), dtype=float32)
 
         # Second convolutional and pool layers
         # This finds 64 different 5 x 5 pixel features
-        d_w2 = tf.get_variable('d_w2', [5, 5, 32, 64], initializer=tf.truncated_normal_initializer(stddev=0.02))
-        d_b2 = tf.get_variable('d_b2', [64], initializer=tf.constant_initializer(0))
-        d2 = tf.nn.conv2d(input=d1, filter=d_w2, strides=[1, 1, 1, 1], padding='SAME')
-        d2 = d2 + d_b2
-        d2 = tf.nn.relu(d2)
-        d2 = tf.nn.avg_pool(d2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME')
+        d_w2 = tf.get_variable('d_w2', [5, 5, 32, 64], initializer=tf.truncated_normal_initializer(stddev=0.02)) # Tensor("d_w2/read:0", shape=(5, 5, 32, 64), dtype=float32) ......Tensor("d_w2/read:0", shape=(5, 5, 32, 64), dtype=float32)
+        d_b2 = tf.get_variable('d_b2', [64], initializer=tf.constant_initializer(0)) # Tensor("d_b2/read:0", shape=(64,), dtype=float32) ......Tensor("d_b2/read:0", shape=(64,), dtype=float32)
+        d2 = tf.nn.conv2d(input=d1, filter=d_w2, strides=[1, 1, 1, 1], padding='SAME') # Tensor("Conv2D_4:0", shape=(?, 14, 14, 64), dtype=float32) .....Tensor("Conv2D_6:0", shape=(50, 14, 14, 64), dtype=float32)
+        d2 = d2 + d_b2 # Tensor("add_5:0", shape=(?, 14, 14, 64), dtype=float32) .....Tensor("add_9:0", shape=(50, 14, 14, 64), dtype=float32)
+        d2 = tf.nn.relu(d2) # Tensor("Relu_4:0", shape=(?, 14, 14, 64), dtype=float32) .......Tensor("Relu_7:0", shape=(50, 14, 14, 64), dtype=float32)
+        d2 = tf.nn.avg_pool(d2, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME') # Tensor("AvgPool_1:0", shape=(?, 7, 7, 64), dtype=float32) .....Tensor("AvgPool_3:0", shape=(50, 7, 7, 64), dtype=float32)
 
         # First fully connected layer
-        d_w3 = tf.get_variable('d_w3', [7 * 7 * 64, 1024], initializer=tf.truncated_normal_initializer(stddev=0.02))
-        d_b3 = tf.get_variable('d_b3', [1024], initializer=tf.constant_initializer(0))
-        d3 = tf.reshape(d2, [-1, 7 * 7 * 64])
-        d3 = tf.matmul(d3, d_w3)
-        d3 = d3 + d_b3
-        d3 = tf.nn.relu(d3)
+        d_w3 = tf.get_variable('d_w3', [7 * 7 * 64, 1024], initializer=tf.truncated_normal_initializer(stddev=0.02)) # Tensor("d_w3/read:0", shape=(3136, 1024), dtype=float32) ......Tensor("d_w3/read:0", shape=(3136, 1024), dtype=float32)
+        d_b3 = tf.get_variable('d_b3', [1024], initializer=tf.constant_initializer(0)) # Tensor("d_b3/read:0", shape=(1024,), dtype=float32) .......Tensor("d_b3/read:0", shape=(1024,), dtype=float32)
+        d3 = tf.reshape(d2, [-1, 7 * 7 * 64]) # Tensor("Reshape_1:0", shape=(?, 3136), dtype=float32) ......Tensor("Reshape_2:0", shape=(50, 3136), dtype=float32)
+        d3 = tf.matmul(d3, d_w3) # Tensor("MatMul_1:0", shape=(?, 1024), dtype=float32) .......Tensor("MatMul_3:0", shape=(50, 1024), dtype=float32)
+        d3 = d3 + d_b3 # Tensor("add_6:0", shape=(?, 1024), dtype=float32) .....Tensor("add_10:0", shape=(50, 1024), dtype=float32)
+        d3 = tf.nn.relu(d3) # Tensor("Relu_5:0", shape=(?, 1024), dtype=float32) ......Tensor("Relu_8:0", shape=(50, 1024), dtype=float32)
 
         # Second fully connected layer
-        d_w4 = tf.get_variable('d_w4', [1024, 1], initializer=tf.truncated_normal_initializer(stddev=0.02))
-        d_b4 = tf.get_variable('d_b4', [1], initializer=tf.constant_initializer(0))
-        d4 = tf.matmul(d3, d_w4) + d_b4
+        d_w4 = tf.get_variable('d_w4', [1024, 1], initializer=tf.truncated_normal_initializer(stddev=0.02)) # Tensor("d_w4/read:0", shape=(1024, 1), dtype=float32) .......Tensor("d_w4/read:0", shape=(1024, 1), dtype=float32)
+        d_b4 = tf.get_variable('d_b4', [1], initializer=tf.constant_initializer(0)) # Tensor("d_b4/read:0", shape=(1,), dtype=float32) .....Tensor("d_b4/read:0", shape=(1,), dtype=float32)
+        d4 = tf.matmul(d3, d_w4) + d_b4 # Tensor("add_7:0", shape=(?, 1), dtype=float32) ......Tensor("add_11:0", shape=(50, 1), dtype=float32)
 
         # d4 contains unscaled values
         return d4
@@ -123,7 +128,7 @@ Dx = discriminator(x_placeholder)
 # for the real MNIST images
 
 # Dg 为鉴别器预测生成图片的概率
-Dg = discriminator(Gz, reuse_variables=True)
+Dg = discriminator(Gz, reuse_variables=True)  # 这里调用函数
 # Dg will hold discriminator prediction probabilities for generated images
 
 
@@ -201,12 +206,13 @@ sess.run(tf.global_variables_initializer())
 for i in range(100000):
     real_image_batch = mnist.train.next_batch(batch_size)[0].reshape([batch_size, 28, 28, 1])
 
-    print('0',sess.run(d_vars[0]))
-    print('1',sess.run(d_vars[1]))
+    # print('0',sess.run(d_vars[0]))
+    # print('1',sess.run(d_vars[1]))
     # Train discriminator on both real and fake images
+    print('d_trainer_real,d_trainer_fake')
     _, __ = sess.run([d_trainer_real, d_trainer_fake],
                                            {x_placeholder: real_image_batch})
-
+    print('g_trainer')
     # Train generator
     _ = sess.run(g_trainer)
 
