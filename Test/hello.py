@@ -10,3 +10,5 @@ c={'a':3,'b':2}
 import logging
 
 logging.info('........')
+logging.info('git test')
+logging.info('add user1')
